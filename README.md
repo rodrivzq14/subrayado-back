@@ -3,8 +3,8 @@
 API REST de **Subrayado**, una red social para lectores donde se publican reseñas de libros. Trabajo Práctico #2 de Programación IV (UTN Avellaneda, Tecnicatura Universitaria en Programación).
 
 - **Front:** https://github.com/rodrivzq14/subrayado-front
-- **API desplegada:** _proximamente_
-- **App desplegada:** _proximamente_
+- **API desplegada:** https://subrayado-back.onrender.com
+- **App desplegada:** https://subrayado-vazquez.netlify.app
 
 ## Tecnologías
 
