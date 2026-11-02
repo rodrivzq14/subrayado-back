@@ -6,11 +6,13 @@ API REST de **Subrayado**, una red social para lectores donde se publican reseñ
 - **API desplegada:** https://subrayado-back.onrender.com
 - **App desplegada:** https://subrayado-vazquez.netlify.app
 
+> El plan gratuito de Render duerme el servicio tras un rato sin uso, por lo que la primera petición puede tardar hasta un minuto.
+
 ## Tecnologías
 
 - NestJS
 - MongoDB Atlas con Mongoose
-- JWT (`@nestjs/jwt`)
+- JWT (`@nestjs/jwt`) y un guard propio para proteger rutas
 - bcrypt para el hash de contraseñas
 - class-validator y class-transformer para validar los datos
 - Multer + Cloudinary para las imágenes
@@ -33,7 +35,7 @@ Creá un archivo `.env` en la raíz (podés copiar `.env.example`):
 
 ```
 MONGO_URI=mongodb+srv://USUARIO:PASSWORD@cluster0.xxxxx.mongodb.net/subrayado?retryWrites=true&w=majority
-JWT_SECRET=valor_aleatorio
+JWT_SECRET=un_valor_largo_y_aleatorio
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
@@ -51,14 +53,16 @@ CLOUDINARY_API_SECRET=
 
 ```
 src/
-├── autenticacion/   registro, login, DTOs
+├── autenticacion/   registro, login, DTOs, guard JWT y decorador del usuario actual
 ├── usuarios/        schema y servicio de usuarios
-├── publicaciones/   (se completa en el Sprint 2)
+├── publicaciones/   reseñas y me gusta (schema, DTOs, servicio y controlador)
 ├── cloudinary/      subida de imágenes
-└── common/          tipos compartidos
+└── common/          tipos y pipes compartidos
 ```
 
-## Endpoints (Sprint 1)
+## Autenticación
+
+Las rutas de publicaciones exigen el header `Authorization: Bearer <token>`. El token se obtiene en el registro o en el login y vence a los 15 minutos. Si falta o es inválido, la API responde `401`.
 
 ### `POST /autenticacion/registro`
 
@@ -88,21 +92,66 @@ Body JSON:
 
 Respuesta `200`: `{ usuario, token }`.
 
+## Publicaciones (reseñas)
+
+Una reseña tiene título del libro, texto, portada opcional y calificación opcional de 1 a 5.
+
+| Método | Ruta | Descripción | Éxito |
+|---|---|---|---|
+| POST | `/publicaciones` | Crea una reseña (`multipart/form-data`) | 201 |
+| GET | `/publicaciones` | Lista las reseñas activas | 200 |
+| DELETE | `/publicaciones/:id` | Baja lógica. Solo el autor o un administrador | 200 |
+| POST | `/publicaciones/:id/me-gusta` | Da me gusta (uno por usuario) | 201 |
+| DELETE | `/publicaciones/:id/me-gusta` | Quita el me gusta propio | 200 |
+
+### `POST /publicaciones`
+
+| Campo | Obligatorio | Detalle |
+|---|---|---|
+| titulo | Sí | Máximo 150 caracteres |
+| mensaje | Sí | Máximo 2000 caracteres |
+| calificacion | No | Entero de 1 a 5 |
+| imagen | No | Archivo de imagen, máximo 5 MB. Se guarda en Cloudinary |
+
+### `GET /publicaciones`
+
+Query params, todos opcionales:
+
+| Parámetro | Valores | Por defecto |
+|---|---|---|
+| orden | `fecha` o `meGusta` | `fecha` |
+| usuario | Id de un usuario, para ver solo sus reseñas | Todos |
+| offset | Cantidad de reseñas a saltear | 0 |
+| limit | Cantidad a traer (1 a 50) | 10 |
+
+Respuesta:
+
+```json
+{ "items": [ { "_id": "...", "titulo": "...", "autor": { "nombreUsuario": "..." }, "cantidadMeGusta": 3, "yaLeGusto": true } ], "total": 12, "offset": 0, "limit": 5 }
+```
+
+`yaLeGusto` indica si el usuario que hace la petición ya recomendó esa reseña.
+
 ## Códigos de estado
 
 | Código | Caso |
 |---|---|
-| 201 | Registro exitoso |
-| 200 | Login exitoso |
-| 400 | Datos inválidos o archivo que no es imagen |
-| 401 | Credenciales incorrectas o usuario deshabilitado |
-| 409 | Correo o nombre de usuario ya registrado |
+| 200 | Login, listado, baja de reseña y quitar me gusta |
+| 201 | Registro, alta de reseña y dar me gusta |
+| 400 | Datos inválidos, id mal formado o archivo que no es imagen |
+| 401 | Credenciales incorrectas, usuario deshabilitado, o token ausente, inválido o vencido |
+| 403 | Intentar eliminar la reseña de otro usuario sin ser administrador |
+| 404 | La reseña no existe o ya fue dada de baja |
+| 409 | Correo o usuario duplicado, me gusta repetido o quitar uno que no se dio |
 
-## Seguridad
+## Decisiones de diseño
 
-- Las contraseñas se guardan hasheadas con bcrypt (10 rondas) y nunca se devuelven en las respuestas.
-- El JWT incluye el id, el nombre de usuario y el perfil, y vence a los 15 minutos.
-- Los secretos viven en variables de entorno. El `.env` no se sube al repositorio.
+- **Contraseñas:** se guardan con bcrypt (10 rondas) y nunca se devuelven. El login usa `bcrypt.compare`.
+- **JWT:** el payload lleva el id, el nombre de usuario y el perfil. Un guard propio lo valida y deja al usuario disponible en cada petición.
+- **Baja lógica:** eliminar una reseña pone `activo: false`, y deja de aparecer en los listados.
+- **Me gusta:** se guardan los ids de quienes recomendaron, y la operación es atómica, así un usuario no puede dar dos me gusta aunque lleguen dos peticiones a la vez. Un contador permite ordenar sin calcular.
+- **Imágenes:** Multer las deja en memoria y se suben a Cloudinary. En la base solo queda la URL.
+- **Secretos:** viven en variables de entorno. El `.env` no se sube al repositorio.
 
 ## Deploy (Render)
 
@@ -111,8 +160,6 @@ Respuesta `200`: `{ usuario, token }`.
 - **Variables de entorno:** las mismas del `.env`
 - En MongoDB Atlas, habilitar el acceso desde `0.0.0.0/0` en Network Access.
 
-El plan gratuito de Render duerme el servicio tras un rato sin uso, así que la primera petición puede tardar hasta un minuto.
-
 ## Autor
 
-Rodrigo Vazquez - Programación IV, 4º cuatrimestre.
+Rodrigo Vazquez - Programación IV.
