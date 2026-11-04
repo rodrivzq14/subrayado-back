@@ -5,7 +5,6 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { UsuarioDocument } from '../usuarios/schemas/usuario.schema';
 import { RegistroDto } from './dto/registro.dto';
 import { LoginDto } from './dto/login.dto';
-import { Archivo } from '../common/archivo';
 
 @Injectable()
 export class AutenticacionService {
@@ -35,9 +34,33 @@ export class AutenticacionService {
     return this.respuesta(usuario);
   }
 
-  private respuesta(usuario: UsuarioDocument) {
+  // El guard ya validó la firma y el vencimiento; acá se confirma que el usuario siga habilitado
+  async autorizar(id: string) {
+    const usuario = await this.usuarioValido(id);
+    return { usuario: this.sinPassword(usuario) };
+  }
+
+  async refrescar(id: string) {
+    const usuario = await this.usuarioValido(id);
+    return { token: this.firmar(usuario) };
+  }
+
+  private async usuarioValido(id: string) {
+    const usuario = await this.usuarios.buscarPorId(id);
+    if (!usuario || !usuario.activo) throw new UnauthorizedException('La sesión ya no es válida');
+    return usuario;
+  }
+
+  private firmar(usuario: UsuarioDocument) {
+    return this.jwt.sign({ sub: usuario.id, nombreUsuario: usuario.nombreUsuario, perfil: usuario.perfil });
+  }
+
+  private sinPassword(usuario: UsuarioDocument) {
     const { password, ...datos } = usuario.toObject();
-    const token = this.jwt.sign({ sub: usuario.id, nombreUsuario: usuario.nombreUsuario, perfil: usuario.perfil });
-    return { usuario: datos, token };
+    return datos;
+  }
+
+  private respuesta(usuario: UsuarioDocument) {
+    return { usuario: this.sinPassword(usuario), token: this.firmar(usuario) };
   }
 }

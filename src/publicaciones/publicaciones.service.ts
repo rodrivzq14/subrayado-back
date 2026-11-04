@@ -84,7 +84,19 @@ export class PublicacionesService {
 
   // Saca los datos internos y agrega si el usuario actual ya dio me gusta
   private formatear(p: any, usuarioId: string) {
-    const { meGusta, activo, __v, ...resto } = p;
-    return { ...resto, yaLeGusto: meGusta.some((id: Types.ObjectId) => id.toString() === usuarioId) };
-  }
+  const { meGusta, activo, __v, ...resto } = p;
+  return {
+    ...resto,
+    cantidadComentarios: p.cantidadComentarios ?? 0,
+    yaLeGusto: meGusta.some((id: Types.ObjectId) => id.toString() === usuarioId),
+  };
+}
+  async obtener(id: string, usuarioId: string) {
+  const publicacion = await this.modelo
+    .findOne({ _id: id, activo: true })
+    .populate('autor', CAMPOS_AUTOR)
+    .lean();
+  if (!publicacion) throw new NotFoundException('La reseña no existe');
+  return this.formatear(publicacion, usuarioId);
+}
 }

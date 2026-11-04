@@ -44,6 +44,11 @@ export class PublicacionesController {
     return this.servicio.listar(query, usuario.id);
   }
 
+  @Get(':id')
+  obtener(@Param('id', ObjectIdPipe) id: string, @UsuarioActual() usuario: UsuarioToken) {
+    return this.servicio.obtener(id, usuario.id);
+}
+
   @Delete(':id')
   eliminar(@Param('id', ObjectIdPipe) id: string, @UsuarioActual() usuario: UsuarioToken) {
     return this.servicio.eliminar(id, usuario);

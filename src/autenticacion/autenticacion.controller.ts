@@ -1,8 +1,10 @@
 import {
-  BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, UploadedFile, UseInterceptors,
+  BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AutenticacionService } from './autenticacion.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { UsuarioActual, UsuarioToken } from './usuario-actual.decorator';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Archivo } from '../common/archivo';
 import { RegistroDto } from './dto/registro.dto';
@@ -34,5 +36,19 @@ export class AutenticacionController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.servicio.login(dto);
+  }
+
+  @Post('autorizar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  autorizar(@UsuarioActual() usuario: UsuarioToken) {
+    return this.servicio.autorizar(usuario.id);
+  }
+
+  @Post('refrescar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  refrescar(@UsuarioActual() usuario: UsuarioToken) {
+    return this.servicio.refrescar(usuario.id);
   }
 }

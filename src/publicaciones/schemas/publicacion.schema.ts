@@ -14,6 +14,7 @@ export class Publicacion {
   @Prop({ type: [MongooseSchema.Types.ObjectId], default: [] }) meGusta: Types.ObjectId[];
   @Prop({ default: 0, index: true }) cantidadMeGusta: number;
   @Prop({ default: true }) activo: boolean;
+  @Prop({ default: 0 }) cantidadComentarios: number;
 }
 
 export const PublicacionSchema = SchemaFactory.createForClass(Publicacion);
