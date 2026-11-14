@@ -9,6 +9,7 @@ import { AutenticacionService } from './autenticacion.service';
   imports: [
     UsuariosModule,
     JwtModule.registerAsync({
+      global: true,
       inject: [ConfigService],
       useFactory: (c: ConfigService) => ({
         secret: c.get<string>('JWT_SECRET'),

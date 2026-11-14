@@ -53,16 +53,16 @@ CLOUDINARY_API_SECRET=
 
 ```
 src/
-├── autenticacion/   registro, login, DTOs, guard JWT y decorador del usuario actual
-├── usuarios/        schema y servicio de usuarios
-├── publicaciones/   reseñas, me gusta y comentarios (schemas, DTOs, servicios y controladores)
+├── autenticacion/   registro, login, DTOs, guard JWT, guard de administrador y decorador del usuario actual
+├── usuarios/        schema, servicio y controlador de usuarios (panel de administración y mi perfil)
+├── publicaciones/   reseñas, me gusta, comentarios y estadísticas (schemas, DTOs, servicios y controladores)
 ├── cloudinary/      subida de imágenes
-└── common/          tipos y pipes compartidos
+└── common/          tipos, pipes y opciones de subida compartidas
 ```
 
 ## Autenticación
 
-Las rutas de publicaciones, comentarios, autorizar y refrescar exigen el header `Authorization: Bearer <token>`. El token se obtiene en el registro o en el login y vence a los 15 minutos. Si falta o es inválido, la API responde `401`.
+Todas las rutas, salvo registro y login, exigen el header `Authorization: Bearer <token>`. El token se obtiene en el registro o en el login y vence a los 15 minutos. Si falta, es inválido o el usuario fue deshabilitado, la API responde `401`. Las rutas de administración responden `403` si el usuario no es administrador.
 
 ### `POST /autenticacion/registro`
 
@@ -154,26 +154,54 @@ Respuesta:
 - **Edición:** solo el autor (`403` si no). Si el texto cambia, el comentario queda con `modificado: true`.
 - Si la reseña no existe o fue dada de baja, todas las rutas responden `404`.
 
+## Usuarios
+
+| Método | Ruta | Descripción | Quién | Éxito |
+|---|---|---|---|---|
+| GET | `/usuarios` | Lista todos los usuarios (sin `password`) | Administrador | 200 |
+| POST | `/usuarios` | Alta de un usuario, con los mismos datos del registro y el `perfil` elegido | Administrador | 201 |
+| DELETE | `/usuarios/:id` | Baja lógica: deshabilita al usuario | Administrador | 200 |
+| POST | `/usuarios/:id/habilitar` | Alta lógica: lo vuelve a habilitar | Administrador | 200 |
+| PUT | `/usuarios/mi-perfil` | Edita el perfil propio: nombre, apellido, fecha de nacimiento, descripción y foto (`multipart/form-data`) | Cualquier usuario | 200 |
+
+- Un usuario deshabilitado no puede ingresar: el login responde `401` con el mensaje "Tu usuario está deshabilitado". Si tenía la sesión abierta, su próxima petición también responde `401`.
+- Un administrador no puede deshabilitarse a sí mismo (`400`).
+- En `mi-perfil` no se pueden cambiar el correo, el nombre de usuario ni el perfil.
+
+## Estadísticas
+
+Rutas solo para administradores. Todas reciben `desde` y `hasta` (formato `AAAA-MM-DD`, lapso de hasta 366 días) y cuentan solo reseñas activas.
+
+| Ruta | Respuesta |
+|---|---|
+| GET `/estadisticas/publicaciones-por-usuario` | `[{ usuario, cantidad }]`, de mayor a menor |
+| GET `/estadisticas/comentarios-por-dia` | `{ total, dias: [{ fecha, cantidad }] }`, con todos los días del lapso |
+| GET `/estadisticas/comentarios-por-publicacion` | `[{ publicacion, cantidad }]`; desde la octava en adelante se agrupan en "Otras" |
+
+Los días se agrupan en hora de Argentina.
+
 ## Códigos de estado
 
 | Código | Caso |
 |---|---|
-| 200 | Login, autorizar, refrescar, listado, ver una reseña, baja de reseña, quitar me gusta, listar y editar comentarios |
-| 201 | Registro, alta de reseña, dar me gusta y comentar |
-| 400 | Datos inválidos, id mal formado, archivo que no es imagen o comentario vacío o de más de 500 caracteres |
+| 200 | Login, autorizar, refrescar, listados, ver una reseña, bajas y altas lógicas, quitar me gusta, editar comentario o perfil, estadísticas |
+| 201 | Registro, alta de usuario o de reseña, dar me gusta y comentar |
+| 400 | Datos inválidos, id mal formado, archivo que no es imagen, comentario vacío o de más de 500 caracteres, fechas inválidas, o un admin que intenta deshabilitarse |
 | 401 | Credenciales incorrectas, usuario deshabilitado, o token ausente, inválido o vencido |
-| 403 | Eliminar la reseña de otro usuario sin ser administrador, o editar un comentario ajeno |
-| 404 | La reseña o el comentario no existen, o la reseña ya fue dada de baja |
+| 403 | Ruta de administración sin ser administrador, eliminar la reseña de otro usuario sin ser administrador, o editar un comentario ajeno |
+| 404 | La reseña, el comentario o el usuario no existen, o la reseña ya fue dada de baja |
 | 409 | Correo o usuario duplicado, me gusta repetido o quitar uno que no se dio |
 
 ## Decisiones de diseño
 
 - **Contraseñas:** se guardan con bcrypt (10 rondas) y nunca se devuelven. El login usa `bcrypt.compare`.
-- **JWT:** el payload lleva el id, el nombre de usuario y el perfil. Un guard propio lo valida y deja al usuario disponible en cada petición.
+- **JWT:** el payload lleva el id, el nombre de usuario y el perfil. Un guard propio verifica la firma y, además, busca al usuario en la base: si fue deshabilitado pierde el acceso enseguida, y el perfil que vale es el de la base, no el del token.
+- **Administradores:** `AdminGuard` se usa después del guard JWT y responde `403` si el usuario no es administrador.
 - **Baja lógica:** eliminar una reseña pone `activo: false`, y deja de aparecer en los listados.
 - **Me gusta:** se guardan los ids de quienes recomendaron, y la operación es atómica, así un usuario no puede dar dos me gusta aunque lleguen dos peticiones a la vez. Un contador permite ordenar sin calcular.
 - **Comentarios:** están en su propia colección, con un índice por reseña y fecha. La reseña lleva un contador `cantidadComentarios`, así el listado no los cuenta cada vez.
 - **Sesión:** el token vence a los 15 minutos. `autorizar` confirma que el usuario siga habilitado y `refrescar` emite uno nuevo para extender la sesión.
+- **Estadísticas:** se calculan con agregaciones de MongoDB (`$match`, `$group`, `$lookup`).
 - **Imágenes:** Multer las deja en memoria y se suben a Cloudinary. En la base solo queda la URL.
 - **Secretos:** viven en variables de entorno. El `.env` no se sube al repositorio.
 

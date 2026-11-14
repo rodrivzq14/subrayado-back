@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsuariosService } from '../usuarios/usuarios.service';
@@ -11,18 +11,7 @@ export class AutenticacionService {
   constructor(private usuarios: UsuariosService, private jwt: JwtService) {}
 
   async registro(dto: RegistroDto, imagenPerfil?: string) {
-    const existente =
-      (await this.usuarios.buscarPorCorreoOUsuario(dto.correo)) ??
-      (await this.usuarios.buscarPorCorreoOUsuario(dto.nombreUsuario));
-    if (existente) throw new ConflictException('El correo o el nombre de usuario ya están registrados');
-
-    const hash = await bcrypt.hash(dto.password, 10);
-    const usuario = await this.usuarios.crear({
-      ...dto,
-      password: hash,
-      fechaNacimiento: new Date(dto.fechaNacimiento),
-      imagenPerfil: imagenPerfil ?? '',
-    });
+    const usuario = await this.usuarios.registrar(dto, imagenPerfil);
     return this.respuesta(usuario);
   }
 
@@ -37,7 +26,7 @@ export class AutenticacionService {
   // El guard ya validó la firma y el vencimiento; acá se confirma que el usuario siga habilitado
   async autorizar(id: string) {
     const usuario = await this.usuarioValido(id);
-    return { usuario: this.sinPassword(usuario) };
+    return { usuario: this.usuarios.sinPassword(usuario) };
   }
 
   async refrescar(id: string) {
@@ -55,12 +44,7 @@ export class AutenticacionService {
     return this.jwt.sign({ sub: usuario.id, nombreUsuario: usuario.nombreUsuario, perfil: usuario.perfil });
   }
 
-  private sinPassword(usuario: UsuarioDocument) {
-    const { password, ...datos } = usuario.toObject();
-    return datos;
-  }
-
   private respuesta(usuario: UsuarioDocument) {
-    return { usuario: this.sinPassword(usuario), token: this.firmar(usuario) };
+    return { usuario: this.usuarios.sinPassword(usuario), token: this.firmar(usuario) };
   }
 }

@@ -1,6 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Delete, Get, Param, Post, Query,
-  UploadedFile, UseGuards, UseInterceptors,
+  Body, Controller, Delete, Get, Param, Post, Query, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../autenticacion/jwt-auth.guard';
@@ -8,6 +7,7 @@ import { UsuarioActual, UsuarioToken } from '../autenticacion/usuario-actual.dec
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Archivo } from '../common/archivo';
 import { ObjectIdPipe } from '../common/object-id.pipe';
+import { opcionesImagen } from '../common/opciones-imagen';
 import { CrearPublicacionDto } from './dto/crear-publicacion.dto';
 import { ListarPublicacionesDto } from './dto/listar-publicaciones.dto';
 import { PublicacionesService } from './publicaciones.service';
@@ -21,15 +21,7 @@ export class PublicacionesController {
   ) {}
 
   @Post()
-  @UseInterceptors(
-    FileInterceptor('imagen', {
-      fileFilter: (_req, file, cb) =>
-        file.mimetype.startsWith('image/')
-          ? cb(null, true)
-          : cb(new BadRequestException('El archivo debe ser una imagen'), false),
-      limits: { fileSize: 5 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('imagen', opcionesImagen))
   async crear(
     @Body() dto: CrearPublicacionDto,
     @UploadedFile() archivo: Archivo | undefined,

@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, HttpCode, HttpStatus, Post, UploadedFile, UseGuards, UseInterceptors,
+  Body, Controller, HttpCode, HttpStatus, Post, UploadedFile, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AutenticacionService } from './autenticacion.service';
@@ -7,6 +7,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsuarioActual, UsuarioToken } from './usuario-actual.decorator';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Archivo } from '../common/archivo';
+import { opcionesImagen } from '../common/opciones-imagen';
 import { RegistroDto } from './dto/registro.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -18,15 +19,7 @@ export class AutenticacionController {
   ) {}
 
   @Post('registro')
-  @UseInterceptors(
-    FileInterceptor('imagenPerfil', {
-      fileFilter: (_req, file, cb) =>
-        file.mimetype.startsWith('image/')
-          ? cb(null, true)
-          : cb(new BadRequestException('El archivo debe ser una imagen'), false),
-      limits: { fileSize: 5 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('imagenPerfil', opcionesImagen))
   async registro(@Body() dto: RegistroDto, @UploadedFile() archivo?: Archivo) {
     const url = archivo ? await this.cloudinary.subir(archivo, 'perfiles') : undefined;
     return this.servicio.registro(dto, url);

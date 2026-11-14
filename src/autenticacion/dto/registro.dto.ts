@@ -1,4 +1,5 @@
-import { IsDateString, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { EsFecha } from '../../common/es-fecha.validator';
 
 export class RegistroDto {
   @IsString() @IsNotEmpty() nombre: string;
@@ -11,7 +12,8 @@ export class RegistroDto {
   })
   password: string;
 
-  @IsDateString() fechaNacimiento: string;
+  @EsFecha({ noFutura: true }, { message: 'La fecha de nacimiento debe ser una fecha real (AAAA-MM-DD) y no puede ser futura' })
+  fechaNacimiento: string;
   @IsOptional() @IsString() @MaxLength(300) descripcion?: string;
   @IsOptional() @IsIn(['usuario', 'administrador']) perfil?: string;
 }
