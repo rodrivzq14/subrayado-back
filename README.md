@@ -4,7 +4,7 @@ API REST de **Subrayado**, una red social para lectores donde se publican reseñ
 
 - **Front:** https://github.com/rodrivzq14/subrayado-front
 - **API desplegada:** https://subrayado-back.onrender.com
-- **App desplegada:** https://subrayado-vazquez.netlify.app
+- **App desplegada:** https://subrayado-front.vercel.app
 
 > El plan gratuito de Render duerme el servicio tras un rato sin uso, por lo que la primera petición puede tardar hasta un minuto.
 
@@ -62,7 +62,7 @@ src/
 
 ## Autenticación
 
-Todas las rutas, salvo registro y login, exigen el header `Authorization: Bearer <token>`. El token se obtiene en el registro o en el login y vence a los 15 minutos. Si falta, es inválido o el usuario fue deshabilitado, la API responde `401`. Las rutas de administración responden `403` si el usuario no es administrador.
+Todas las rutas, salvo registro y login, exigen el header `Authorization: Bearer <token>`. El token se obtiene en el registro o en el login y vence a los 60 segundos (`expiresIn` en `autenticacion.module.ts`). Si falta, es inválido o el usuario fue deshabilitado, la API responde `401`. Las rutas de administración responden `403` si el usuario no es administrador.
 
 ### `POST /autenticacion/registro`
 
@@ -98,7 +98,7 @@ Valida el token y que el usuario siga habilitado. Respuesta `200`: `{ usuario }`
 
 ### `POST /autenticacion/refrescar`
 
-Devuelve un token nuevo con el mismo contenido y 15 minutos más de duración. Respuesta `200`: `{ token }`.
+Devuelve un token nuevo con el mismo contenido y 60 segundos más de duración. Respuesta `200`: `{ token }`.
 
 ## Publicaciones (reseñas)
 
@@ -200,7 +200,7 @@ Los días se agrupan en hora de Argentina.
 - **Baja lógica:** eliminar una reseña pone `activo: false`, y deja de aparecer en los listados.
 - **Me gusta:** se guardan los ids de quienes recomendaron, y la operación es atómica, así un usuario no puede dar dos me gusta aunque lleguen dos peticiones a la vez. Un contador permite ordenar sin calcular.
 - **Comentarios:** están en su propia colección, con un índice por reseña y fecha. La reseña lleva un contador `cantidadComentarios`, así el listado no los cuenta cada vez.
-- **Sesión:** el token vence a los 15 minutos. `autorizar` confirma que el usuario siga habilitado y `refrescar` emite uno nuevo para extender la sesión.
+- **Sesión:** el token vence a los 60 segundos. `autorizar` confirma que el usuario siga habilitado y `refrescar` emite uno nuevo para extender la sesión.
 - **Estadísticas:** se calculan con agregaciones de MongoDB (`$match`, `$group`, `$lookup`).
 - **Imágenes:** Multer las deja en memoria y se suben a Cloudinary. En la base solo queda la URL.
 - **Secretos:** viven en variables de entorno. El `.env` no se sube al repositorio.
